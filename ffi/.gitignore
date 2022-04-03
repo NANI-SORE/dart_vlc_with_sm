@@ -1,0 +1,9 @@
+# Object Files
+
+*.o
+
+# Shared Libraries
+
+*.so
+
+pubspec.lock

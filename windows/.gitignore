@@ -1,0 +1,14 @@
+flutter/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+x64/
+x86/
+*.[Cc]ache
+!*.[Cc]ache/
+
+# libVLC & libVLC++ Source
+
+external/vlc-*
+external/libvlcpp-master
