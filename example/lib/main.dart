@@ -4,8 +4,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:dart_vlc/dart_vlc.dart';
 
-void main() {
-  DartVLC.initialize();
+void main() async {
+  await DartVLC.initialize(useFlutterNativeView: true);
   runApp(DartVLCExample());
 }
 
@@ -15,7 +15,11 @@ class DartVLCExample extends StatefulWidget {
 }
 
 class DartVLCExampleState extends State<DartVLCExample> {
-  Player player = Player(id: 0);
+  Player player = Player(
+    id: 0,
+    videoDimensions: VideoDimensions(640, 360),
+    registerTexture: !Platform.isWindows,
+  );
   MediaType mediaType = MediaType.file;
   CurrentState current = CurrentState();
   PositionState position = PositionState();
@@ -54,32 +58,23 @@ class DartVLCExampleState extends State<DartVLCExample> {
         },
       );
       this.player.errorStream.listen((event) {
-        print('⚠️⚠️⚠️ libVLC error received.');
+        print('libvlc error.');
       });
+      this.devices = Devices.all;
+      Equalizer equalizer = Equalizer.createMode(EqualizerMode.live);
+      equalizer.setPreAmp(10.0);
+      equalizer.setBandAmp(31.25, 10.0);
+      this.player.setEqualizer(equalizer);
     }
-  }
-
-  @override
-  Future<void> didChangeDependencies() async {
-    super.didChangeDependencies();
-    this.devices = Devices.all;
-    Equalizer equalizer = Equalizer.createMode(EqualizerMode.live);
-    equalizer.setPreAmp(10.0);
-    equalizer.setBandAmp(31.25, 10.0);
-    this.player.setEqualizer(equalizer);
-    this.setState(() {});
   }
 
   @override
   Widget build(BuildContext context) {
     bool isTablet;
     bool isPhone;
-
     final double devicePixelRatio = ui.window.devicePixelRatio;
-    final ui.Size size = ui.window.physicalSize;
-    final double width = size.width;
-    final double height = size.height;
-
+    final double width = ui.window.physicalSize.width;
+    final double height = ui.window.physicalSize.height;
     if (devicePixelRatio < 2 && (width >= 1000 || height >= 1000)) {
       isTablet = true;
       isPhone = false;
@@ -105,18 +100,23 @@ class DartVLCExampleState extends State<DartVLCExample> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Card(
-                  clipBehavior: Clip.antiAlias,
-                  elevation: 2.0,
-                  child: Video(
-                    player: player,
-                    width: isPhone ? 320 : 640,
-                    height: isPhone ? 240 : 480,
-                    volumeThumbColor: Colors.blue,
-                    volumeActiveColor: Colors.blue,
-                    playlistLength: medias.length,
-                  ),
-                ),
+                Platform.isWindows
+                    ? NativeVideo(
+                        player: player,
+                        width: isPhone ? 320 : 640,
+                        height: isPhone ? 180 : 360,
+                        volumeThumbColor: Colors.blue,
+                        volumeActiveColor: Colors.blue,
+                        showControls: !isPhone,
+                      )
+                    : Video(
+                        player: player,
+                        width: isPhone ? 320 : 640,
+                        height: isPhone ? 180 : 360,
+                        volumeThumbColor: Colors.blue,
+                        volumeActiveColor: Colors.blue,
+                        showControls: !isPhone,
+                      ),
               ],
             ),
             Row(
@@ -681,9 +681,9 @@ class DartVLCExampleState extends State<DartVLCExample> {
                 ),
                 const SizedBox(width: 12.0),
                 ElevatedButton(
-                  onPressed: () => this.player.back(),
+                  onPressed: () => this.player.previous(),
                   child: const Text(
-                    'back',
+                    'previous',
                     style: TextStyle(
                       fontSize: 14.0,
                     ),

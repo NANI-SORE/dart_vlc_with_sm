@@ -142,7 +142,7 @@ public:
      * @param mrl       A path, location, or node name, depending on the 3rd parameter
      * @param type      The type of the 2nd argument. \sa{FromType}
      */
-    Media(Instance& instance, const std::string& mrl, FromType type)
+    Media(const Instance& instance, const std::string& mrl, FromType type)
         : Internal{ libvlc_media_release }
     {
         InternalPtr ptr = nullptr;
@@ -185,7 +185,7 @@ public:
      * \param fd open file descriptor
      * \return the newly created media
      */
-    Media(Instance& instance, int fd)
+    Media(const Instance& instance, int fd)
         : Internal { libvlc_media_new_fd( getInternalPtr<libvlc_instance_t>( instance ), fd ),
                      libvlc_media_release }
     {
@@ -242,7 +242,7 @@ public:
      * In particular, the callback should return an error if playback is stopped;
      * if it does not return, then libvlc_media_player_stop() will never return.
      */
-    using ExpectedMediaReadCb = ssize_t(void* opaque, unsigned char* buf, size_t len);
+    using ExpectedMediaReadCb = ptrdiff_t(void* opaque, unsigned char* buf, size_t len);
 
     /**
      * Callback prototype to seek a custom bitstream input media.
@@ -293,7 +293,7 @@ public:
      */
 
     template <typename OpenCb, typename ReadCb, typename SeekCb, typename CloseCb>
-    Media( Instance& instance, OpenCb&& openCb, ReadCb&& readCb, SeekCb&& seekCb, CloseCb&& closeCb )
+    Media( const Instance& instance, OpenCb&& openCb, ReadCb&& readCb, SeekCb&& seekCb, CloseCb&& closeCb )
     {
         static_assert( signature_match_or_nullptr<OpenCb, ExpectedMediaOpenCb>::value, "Mismatched Open callback prototype" );
         static_assert( signature_match_or_nullptr<SeekCb, ExpectedMediaSeekCb>::value, "Mismatched Seek callback prototype" );
@@ -421,7 +421,7 @@ public:
     /**
      * Read the meta of the media.
      *
-     * If the media has not yet been parsed this will return NULL.
+     * If the media has not yet been parsed this will return an empty string.
      *
      * This methods automatically calls parseAsync() , so after
      * calling it you may receive a libvlc_MediaMetaChanged event. If you
@@ -470,6 +470,7 @@ public:
         return libvlc_media_save_meta(*this) != 0;
     }
 
+#if LIBVLC_VERSION_INT < LIBVLC_VERSION(4, 0, 0, 0)
     /**
      * Get current state of media descriptor object. Possible media states
      * are defined in libvlc_structures.c ( libvlc_NothingSpecial=0,
@@ -484,7 +485,7 @@ public:
     {
         return libvlc_media_get_state(*this);
     }
-
+#endif
     /**
      * Get the current statistics about the media
      *
@@ -807,6 +808,18 @@ public:
         libvlc_media_thumbnail_request_destroy( request );
     }
 
+    enum class FileStat : uint8_t
+    {
+        Mtime = libvlc_media_filestat_mtime,
+        Size = libvlc_media_filestat_size,
+    };
+
+    std::pair<bool, uint64_t> fileStat( FileStat s )
+    {
+        uint64_t value = 0;
+        auto res = libvlc_media_get_filestat( *this, static_cast<uint8_t>( s ), &value ) == 1;
+        return std::make_pair( res, value );
+    }
 #endif
 
 

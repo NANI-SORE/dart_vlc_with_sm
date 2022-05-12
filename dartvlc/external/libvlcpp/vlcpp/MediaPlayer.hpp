@@ -91,7 +91,7 @@ public:
      * \param p_libvlc_instance  the libvlc instance in which the Media
      * Player should be created.
      */
-    MediaPlayer( Instance& instance )
+    MediaPlayer( const Instance& instance )
         : Internal{ libvlc_media_player_new( instance ), libvlc_media_player_release }
     {
     }
@@ -129,8 +129,8 @@ public:
     /**
      * Get the media used by the media_player.
      *
-     * \return the media associated with p_mi, or NULL if no media is
-     * associated
+     * \return the media associated with p_mi, or a nullptr shared_ptr if no
+     * media is associated
      */
     MediaPtr media()
     {
@@ -853,7 +853,7 @@ public:
         std::vector<AudioOutputDeviceDescription> res;
         std::unique_ptr<libvlc_audio_output_device_t, decltype(&libvlc_audio_output_device_list_release)>
                 devicesPtr( devices, libvlc_audio_output_device_list_release);
-        for ( auto* p = devices; p != NULL; p = p->p_next )
+        for ( auto* p = devices; p != nullptr; p = p->p_next )
             res.emplace_back( p );
         return res;
     }
@@ -896,6 +896,12 @@ public:
      *
      * \return Nothing. Errors are ignored (this is a design bug).
      */
+#if LIBVLC_VERSION_INT >= LIBVLC_VERSION(4, 0, 0, 0)
+    void outputDeviceSet(const std::string& device_id)
+    {
+        libvlc_audio_output_device_set(*this, device_id.c_str());
+    }
+#else
     void outputDeviceSet(const std::string& module, const std::string& device_id)
     {
         libvlc_audio_output_device_set(*this, module.c_str(), device_id.c_str());
@@ -905,6 +911,8 @@ public:
     {
         libvlc_audio_output_device_set(*this, nullptr, device_id.c_str());
     }
+#endif
+
 
     /**
      * Toggle mute status.
@@ -1637,13 +1645,13 @@ public:
     void setDeinterlace(DeinterlaceState state, const std::string& mode)
     {
         libvlc_video_set_deinterlace(*this, static_cast<int>( state ),
-                                     mode.empty() ? NULL : mode.c_str());
+                                     mode.empty() ? nullptr: mode.c_str());
     }
 #else
     void setDeinterlace(const std::string& mode)
     {
         libvlc_video_set_deinterlace(*this,
-                                     mode.empty() ? NULL : mode.c_str());
+                                     mode.empty() ? nullptr : mode.c_str());
     }
 #endif
 

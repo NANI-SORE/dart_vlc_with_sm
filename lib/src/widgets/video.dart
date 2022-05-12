@@ -1,3 +1,21 @@
+// This file is a part of dart_vlc (https://github.com/alexmercerind/dart_vlc)
+//
+// Copyright (C) 2021-2022 Hitesh Kumar Saini <saini123hitesh@gmail.com>
+//
+// This program is free software; you can redistribute it and/or
+// modify it under the terms of the GNU Lesser General Public
+// License as published by the Free Software Foundation; either
+// version 3 of the License, or (at your option) any later version.
+//
+// This program is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+// Lesser General Public License for more details.
+//
+// You should have received a copy of the GNU Lesser General Public License
+// along with this program; if not, write to the Free Software Foundation,
+// Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
 // ignore_for_file: implementation_imports
 import 'dart:async';
 import 'dart:typed_data';
@@ -5,6 +23,7 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:dart_vlc/dart_vlc.dart';
 import 'package:dart_vlc/src/widgets/controls.dart';
+import 'package:window_manager/window_manager.dart';
 
 /// Internally used map to keep [GlobalKey]s for [Video]'s [ControlState]s.
 Map<int, GlobalKey<ControlState>> controls = {};
@@ -82,7 +101,8 @@ class Video extends StatefulWidget {
     this.showTimeLeft = false,
     this.progressBarTextStyle = const TextStyle(),
     this.filterQuality = FilterQuality.low,
-    required this.playlistLength,
+    this.showFullscreenButton = false,
+    this.fillColor: Colors.black,
   })  : player = player ?? players[playerId]! as Player,
         super(key: key);
 
@@ -151,12 +171,11 @@ class Video extends StatefulWidget {
   /// instead of the total time, set this to true
   final bool showTimeLeft;
 
-  /// The length of the playlist of media being played.
-  ///
-  /// This is useful for determining whether or not to show the "skip next"
-  /// and "skip previous" control buttons - if there is only one media in
-  /// the playlist, the buttons will not be shown.
-  final int playlistLength;
+  /// Whether to show the fullscreen button.
+  final bool showFullscreenButton;
+
+  /// Fill color.
+  final Color fillColor;
 
   _VideoStateBase createState() => _VideoStateTexture();
 }
@@ -173,17 +192,67 @@ abstract class _VideoStateBase extends State<Video>
     if (widget.showControls) controls[playerId] = controlKey;
   }
 
+  void enterFullscreen() async {
+    await windowManager.ensureInitialized();
+    await windowManager.setFullScreen(true);
+    Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        transitionDuration: Duration.zero,
+        reverseTransitionDuration: Duration.zero,
+        pageBuilder: (_, __, ___) => Scaffold(
+          body: Container(
+            height: double.infinity,
+            width: double.infinity,
+            color: widget.fillColor,
+            child: widget.showControls
+                ? Control(
+                    player: widget.player,
+                    enterFullscreen: enterFullscreen,
+                    exitFullscreen: exitFullscreen,
+                    isFullscreen: true,
+                    progressBarThumbRadius: widget.progressBarThumbRadius,
+                    progressBarThumbGlowRadius:
+                        widget.progressBarThumbGlowRadius,
+                    progressBarActiveColor: widget.progressBarActiveColor,
+                    progressBarInactiveColor: widget.progressBarInactiveColor,
+                    progressBarThumbColor: widget.progressBarThumbColor,
+                    progressBarThumbGlowColor: widget.progressBarThumbGlowColor,
+                    volumeActiveColor: widget.volumeActiveColor,
+                    volumeInactiveColor: widget.volumeInactiveColor,
+                    volumeBackgroundColor: widget.volumeBackgroundColor,
+                    volumeThumbColor: widget.volumeThumbColor,
+                    showTimeLeft: widget.showTimeLeft,
+                    progressBarTextStyle: widget.progressBarTextStyle,
+                    child: present(),
+                  )
+                : present(),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void exitFullscreen() async {
+    await windowManager.ensureInitialized();
+    await windowManager.setFullScreen(false);
+    Navigator.of(context, rootNavigator: false).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
     super.build(context);
     return Container(
       width: widget.width ?? double.infinity,
       height: widget.height ?? double.infinity,
-      color: Colors.black,
+      color: widget.fillColor,
       child: widget.showControls
           ? Control(
               key: controlKey,
               player: widget.player,
+              enterFullscreen: enterFullscreen,
+              exitFullscreen: exitFullscreen,
+              isFullscreen: false,
+              showFullscreenButton: widget.showFullscreenButton,
               progressBarThumbRadius: widget.progressBarThumbRadius,
               progressBarThumbGlowRadius: widget.progressBarThumbGlowRadius,
               progressBarActiveColor: widget.progressBarActiveColor,
@@ -196,7 +265,6 @@ abstract class _VideoStateBase extends State<Video>
               volumeThumbColor: widget.volumeThumbColor,
               showTimeLeft: widget.showTimeLeft,
               progressBarTextStyle: widget.progressBarTextStyle,
-              playlistLength: widget.playlistLength,
               child: present(),
             )
           : present(),
@@ -215,12 +283,17 @@ class _VideoStateTexture extends _VideoStateBase {
   @override
   void initState() {
     super.initState();
+    _videoWidth = widget.player.videoDimensions.width.toDouble();
+    _videoHeight = widget.player.videoDimensions.height.toDouble();
     _videoDimensionsSubscription =
         widget.player.videoDimensionsStream.listen((dimensions) {
-      setState(() {
-        _videoWidth = dimensions.width.toDouble();
-        _videoHeight = dimensions.height.toDouble();
-      });
+      if (_videoWidth != dimensions.width.toDouble() &&
+          _videoHeight != dimensions.height.toDouble()) {
+        setState(() {
+          _videoWidth = dimensions.width.toDouble();
+          _videoHeight = dimensions.height.toDouble();
+        });
+      }
     });
     if (mounted) setState(() {});
   }
